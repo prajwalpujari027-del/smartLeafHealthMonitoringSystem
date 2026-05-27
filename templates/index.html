@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeafSense — Smart Plant Health Monitor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+:root {
+  --bg:         #0c110d;
+  --surface:    #111a12;
+  --surface2:   #192019;
+  --border:     rgba(134,191,118,0.15);
+  --accent:     #7ec96d;
+  --accent2:    #b8f5a8;
+  --gold:       #e8c96d;
+  --red:        #f87171;
+  --red-soft:   rgba(248,113,113,0.12);
+  --green-soft: rgba(126,201,109,0.12);
+  --text:       #e8f0e4;
+  --muted:      #7a9172;
+  --radius:     18px;
+  --radius-sm:  10px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg); color:var(--text);
+  min-height:100vh; overflow-x:hidden;
+}
+body::before {
+  content:''; position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 0%,  rgba(62,110,50,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 90% 80%, rgba(62,110,50,.12) 0%, transparent 60%);
+  pointer-events:none;
+}
+.container { max-width:1380px; margin:auto; padding:28px 32px; position:relative; z-index:1; }
+
+/* Header */
+.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:36px; gap:16px; flex-wrap:wrap; }
+.logo { display:flex; align-items:center; gap:14px; }
+.logo-icon { width:48px; height:48px; background:linear-gradient(135deg,#3d7a30,#7ec96d); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 24px rgba(126,201,109,.35); }
+.logo h1 { font-family:'Playfair Display',serif; font-size:28px; font-weight:900; color:var(--accent2); letter-spacing:-.5px; }
+.logo small { display:block; font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:1px; }
+.badge-row { display:flex; gap:10px; align-items:center; }
+.badge { padding:7px 16px; border-radius:30px; font-size:12px; font-weight:600; letter-spacing:.5px; font-family:'DM Mono',monospace; }
+.badge-live { background:rgba(126,201,109,.15); color:var(--accent); border:1px solid rgba(126,201,109,.3); animation:pulse-badge 2.5s ease-in-out infinite; }
+.badge-live::before { content:'● '; }
+.badge-model { background:rgba(232,201,109,.12); color:var(--gold); border:1px solid rgba(232,201,109,.25); }
+@keyframes pulse-badge { 0%,100%{box-shadow:0 0 0 0 rgba(126,201,109,.25)} 50%{box-shadow:0 0 0 8px rgba(126,201,109,0)} }
+
+/* Live Sensor Banner */
+.live-sensor-banner {
+  background:linear-gradient(135deg,rgba(232,201,109,.08),rgba(126,201,109,.08));
+  border:1px solid rgba(232,201,109,.2); border-radius:12px; padding:16px 24px;
+  display:flex; gap:28px; align-items:center; flex-wrap:wrap; margin-bottom:22px;
+}
+.lsb-item { display:flex; flex-direction:column; gap:4px; }
+.lsb-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-family:'DM Mono',monospace; }
+.lsb-val { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; color:var(--gold); line-height:1; }
+.lsb-unit { font-size:11px; color:var(--muted); }
+.lsb-sep { width:1px; height:44px; background:var(--border); }
+.lsb-status-wrap { margin-left:auto; display:flex; flex-direction:column; gap:5px; align-items:flex-end; }
+.sensor-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:5px; vertical-align:middle; transition:background .4s; }
+.sensor-dot.live { background:var(--accent); animation:pulse-badge 2s infinite; }
+.sensor-dot.warn { background:var(--gold); }
+.lsb-status-txt { font-size:12px; font-family:'DM Mono',monospace; color:var(--muted); }
+
+/* Stats */
+.stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:24px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px 22px; position:relative; overflow:hidden; transition:transform .2s,box-shadow .2s; }
+.stat-card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(0,0,0,.4); }
+.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent),transparent); }
+.stat-label { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; font-family:'DM Mono',monospace; }
+.stat-value { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; color:var(--accent2); line-height:1; }
+.stat-value.online { color:var(--accent); }
+.stat-value.gold   { color:var(--gold); }
+.stat-sub { font-size:11px; color:var(--muted); margin-top:8px; }
+
+/* Main Grid */
+.main-grid { display:grid; grid-template-columns:1.05fr .95fr; gap:20px; }
+
+/* Panel */
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:28px; }
+.panel-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:var(--accent2); margin-bottom:22px; display:flex; align-items:center; gap:10px; }
+.panel-title-icon { width:34px; height:34px; background:var(--green-soft); border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:17px; }
+
+/* Upload */
+.upload-zone { border:2px dashed rgba(126,201,109,.25); border-radius:14px; padding:48px 24px; text-align:center; cursor:pointer; transition:all .3s; background:rgba(126,201,109,.03); }
+.upload-zone:hover { border-color:var(--accent); background:rgba(126,201,109,.07); transform:scale(1.005); }
+.upload-emoji { font-size:52px; margin-bottom:14px; display:block; }
+.upload-zone h3 { font-size:17px; font-weight:600; color:var(--text); margin-bottom:6px; }
+.upload-zone p { font-size:13px; color:var(--muted); }
+.browse-btn { display:inline-block; margin-top:16px; background:linear-gradient(135deg,#3d7a30,#7ec96d); color:#fff; padding:10px 24px; border-radius:30px; font-size:13px; font-weight:600; }
+.upload-zone:hover .browse-btn { box-shadow:0 4px 20px rgba(126,201,109,.4); }
+#imageInput { display:none; }
+#preview { width:100%; margin-top:20px; border-radius:12px; max-height:280px; object-fit:contain; display:none; border:1px solid var(--border); }
+
+/* Result */
+.result-box { margin-top:22px; padding:22px; border-radius:var(--radius-sm); display:none; border:1px solid var(--border); animation:fadeUp .4s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.result-box.healthy { background:var(--green-soft); border-color:rgba(126,201,109,.3); }
+.result-box.disease { background:var(--red-soft);   border-color:rgba(248,113,113,.25); }
+.result-box.unknown { background:rgba(232,201,109,.1); border-color:rgba(232,201,109,.25); }
+.disease-name { font-family:'Playfair Display',serif; font-size:21px; font-weight:700; margin-bottom:14px; }
+.result-box.healthy .disease-name { color:var(--accent2); }
+.result-box.disease  .disease-name { color:var(--red); }
+.result-box.unknown  .disease-name { color:var(--gold); }
+.confidence-row { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-bottom:8px; }
+.conf-val { color:var(--text); font-weight:600; font-family:'DM Mono',monospace; }
+.bar-track { width:100%; height:8px; background:rgba(255,255,255,.07); border-radius:20px; overflow:hidden; margin-bottom:18px; }
+.bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#3d7a30,#7ec96d); border-radius:20px; transition:width .8s cubic-bezier(.4,0,.2,1); }
+.result-box.disease .bar-fill { background:linear-gradient(90deg,#b91c1c,#f87171); }
+.result-box.unknown .bar-fill { background:linear-gradient(90deg,#92400e,#e8c96d); }
+
+/* Temp tiles in result */
+.temp-row { display:flex; gap:12px; margin-bottom:18px; }
+.temp-tile { flex:1; background:rgba(232,201,109,.08); border:1px solid rgba(232,201,109,.2); border-radius:10px; padding:14px; text-align:center; }
+.temp-tile-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:5px; font-family:'DM Mono',monospace; }
+.temp-tile-val  { font-family:'Playfair Display',serif; font-size:26px; font-weight:700; color:var(--gold); }
+.temp-tile-unit { font-size:11px; color:var(--muted); }
+
+/* Info grid */
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+.info-tile { background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.info-tile-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; font-family:'DM Mono',monospace; }
+.info-tile-val { font-size:13px; color:var(--text); line-height:1.5; }
+
+/* Buttons */
+.btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+.action-btn { flex:1; min-width:130px; padding:12px 16px; border-radius:10px; border:none; cursor:pointer; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; transition:.2s; }
+.btn-green { background:linear-gradient(135deg,#3d7a30,#5aad44); color:#fff; }
+.btn-green:hover { box-shadow:0 6px 20px rgba(90,173,68,.4); transform:translateY(-1px); }
+.btn-red   { background:linear-gradient(135deg,#991b1b,#ef4444); color:#fff; }
+.btn-red:hover   { box-shadow:0 6px 20px rgba(239,68,68,.4);  transform:translateY(-1px); }
+
+/* Right panel */
+.right-panel { display:flex; flex-direction:column; gap:20px; }
+.chart-wrap { background:var(--surface2); border-radius:12px; padding:20px; }
+.chart-wrap canvas { max-height:180px; }
+.sensor-table { width:100%; border-collapse:collapse; }
+.sensor-table tr { border-bottom:1px solid rgba(255,255,255,.05); }
+.sensor-table tr:last-child { border:none; }
+.sensor-table td { padding:11px 0; font-size:13px; }
+.sensor-table td:first-child { color:var(--muted); }
+.sensor-table td:last-child  { text-align:right; }
+.dot-green { color:var(--accent); font-weight:700; }
+.dot-gold  { color:var(--gold);   font-weight:700; }
+.dot-red   { color:var(--red);    font-weight:700; }
+.divider-label { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); font-family:'DM Mono',monospace; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+.divider-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* Responsive */
+@media(max-width:1150px){ .stats-row{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:1050px){ .main-grid{grid-template-columns:1fr} }
+@media(max-width:700px) { .stats-row{grid-template-columns:1fr 1fr} }
+@media(max-width:600px) {
+  .container{padding:18px 16px}
+  .info-grid{grid-template-columns:1fr}
+  .temp-row{flex-direction:column}
+  .logo h1{font-size:22px}
+  .live-sensor-banner{flex-direction:column;gap:12px}
+  .lsb-sep{display:none}
+  .lsb-status-wrap{margin-left:0;align-items:flex-start}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🌿</div>
+      <div>
+        <h1>LeafSense</h1>
+        <small>Smart Plant Health Monitor · ESP32 + MLX90614 + CNN</small>
+      </div>
+    </div>
+    <div class="badge-row">
+      <span class="badge badge-live">AI Active</span>
+      <span class="badge badge-model">CNN v2 · PlantVillage</span>
+    </div>
+  </div>
+
+  <!-- Live Sensor Banner -->
+  <div class="live-sensor-banner">
+    <div class="lsb-item">
+      <div class="lsb-label">🌡 Leaf Surface Temp</div>
+      <div class="lsb-val" id="liveObjTemp">--.-</div>
+      <div class="lsb-unit">°C · MLX90614 Object</div>
+    </div>
+    <div class="lsb-sep"></div>
+    <div class="lsb-item">
+      <div class="lsb-label">🌤 Ambient Temp</div>
+      <div class="lsb-val" id="liveAmbTemp">--.-</div>
+      <div class="lsb-unit">°C · MLX90614 Ambient</div>
+    </div>
+    <div class="lsb-sep"></div>
+    <div class="lsb-status-wrap">
+      <div class="lsb-label">ESP32 Status</div>
+      <div><span class="sensor-dot" id="sensorDot"></span><span class="lsb-status-txt" id="sensorStatusText">Waiting for data…</span></div>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Detection Result</div>
+      <div class="stat-value" id="leafStatus" style="font-size:15px;padding-top:6px">Awaiting scan</div>
+      <div class="stat-sub">CNN Classification</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Confidence Score</div>
+      <div class="stat-value" id="confidenceValue">—</div>
+      <div class="stat-sub">Prediction accuracy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Leaf Temp (Live)</div>
+      <div class="stat-value gold" id="leafTempCard">—</div>
+      <div class="stat-sub">MLX90614 · Object</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ambient Temp (Live)</div>
+      <div class="stat-value gold" id="ambTempCard">—</div>
+      <div class="stat-sub">MLX90614 · Ambient</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">System Status</div>
+      <div class="stat-value online">ONLINE</div>
+      <div class="stat-sub">All subsystems nominal</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+
+    <!-- Left -->
+    <div class="panel">
+      <div class="panel-title">
+        <div class="panel-title-icon">📷</div>
+        Upload Tomato Leaf Image
+      </div>
+
+      <div class="upload-zone" onclick="document.getElementById('imageInput').click()">
+        <span class="upload-emoji">🍃</span>
+        <h3>Drop or click to upload</h3>
+        <p>JPG / PNG &nbsp;·&nbsp; Recommended 224 × 224 px or larger</p>
+        <span class="browse-btn">Choose File</span>
+      </div>
+      <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)">
+      <img id="preview" alt="Leaf preview">
+
+      <button id="predictBtn" style="width:100%; margin-top:16px; display:none; padding:14px; font-size:15px; font-weight:700; background:linear-gradient(135deg,#3d7a30,#5aad44); color:#fff; border:none; border-radius:10px; cursor:pointer; transition:.2s;">
+        🔬 Run Prediction
+      </button>
+
+      <div class="result-box" id="resultBox">
+        <div class="disease-name" id="diseaseName">—</div>
+
+        <div class="confidence-row">
+          <span>Model Confidence</span>
+          <span class="conf-val" id="confidenceText">0%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="confidenceFill"></div></div>
+
+        <div class="temp-row">
+          <div class="temp-tile">
+            <div class="temp-tile-label">🌡 Leaf Temp at Scan</div>
+            <div class="temp-tile-val" id="scanObjTemp">—</div>
+            <div class="temp-tile-unit">°C · MLX90614 Object</div>
+          </div>
+          <div class="temp-tile">
+            <div class="temp-tile-label">🌤 Ambient at Scan</div>
+            <div class="temp-tile-val" id="scanAmbTemp">—</div>
+            <div class="temp-tile-unit">°C · MLX90614 Ambient</div>
+          </div>
+        </div>
+
+        <div class="info-grid">
+
+          <div class="info-tile">
+            <div class="info-tile-label">⚠ Thermal Warning</div>
+            <div class="info-tile-val" id="tempWarning">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">🌡 Thermal Status</div>
+            <div class="info-tile-val" id="tempStatus">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">🚨 Risk Level</div>
+            <div class="info-tile-val" id="riskLevel">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">💡 Advice</div>
+            <div class="info-tile-val" id="adviceText">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">🌱 Fertilizer</div>
+            <div class="info-tile-val" id="fertilizerText">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">🧪 Pesticide</div>
+            <div class="info-tile-val" id="pesticideText">—</div>
+          </div>
+
+          <div class="info-tile">
+            <div class="info-tile-label">🌿 Organic</div>
+            <div class="info-tile-val" id="organicText">—</div>
+          </div>
+
+        </div>
+
+        <div class="btn-row">
+          <a id="productLink" href="#" target="_blank" class="action-btn btn-green">🛒 Buy Product</a>
+          <a id="youtubeLink" href="#" target="_blank" class="action-btn btn-red">▶ Watch Tutorial</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right -->
+    <div class="right-panel">
+      <div class="panel">
+        <div class="panel-title"><div class="panel-title-icon">📊</div>Prediction Analytics</div>
+        <div class="chart-wrap"><canvas id="predictionChart"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="divider-label">Hardware Sensors</div>
+        <table class="sensor-table">
+          <tr><td>ESP32 MCU</td>        <td id="esp32Status" class="dot-gold">● Waiting</td></tr>
+          <tr><td>MLX90614 Thermal</td> <td id="mlxStatus"   class="dot-gold">● Waiting</td></tr>
+          <tr><td>I²C Bus (SDA 21 / SCL 22)</td><td class="dot-green">● Active</td></tr>
+          <tr><td>LCD Display (0x27)</td><td class="dot-green">● Active</td></tr>
+          <tr><td>Camera Module</td>    <td class="dot-green">● Active</td></tr>
+        </table>
+        <div class="divider-label" style="margin-top:20px">Software</div>
+        <table class="sensor-table">
+          <tr><td>Flask Backend</td>           <td class="dot-green">● Connected</td></tr>
+          <tr><td>CNN Model</td>               <td class="dot-green">● Loaded</td></tr>
+          <tr><td>Disease Classification</td>  <td class="dot-green">● Enabled</td></tr>
+          <tr><td>Farmer Suggestions</td>      <td class="dot-green">● Enabled</td></tr>
+          <tr><td>Live Sensor Polling</td>     <td id="pollStatus" class="dot-gold">● Starting</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const solutionsMap = {
+  "Tomato___Leaf_Mold":
+    {product_link:"https://www.amazon.in/s?k=sulfur+fungicide+tomato",youtube:"https://www.youtube.com/results?search_query=tomato+leaf+mold+treatment"},
+  "Tomato___Septoria_leaf_spot":
+    {product_link:"https://www.amazon.in/s?k=copper+fungicide+plants",youtube:"https://www.youtube.com/results?search_query=septoria+leaf+spot+tomato"},
+  "Tomato___Spider_mites Two-spotted_spider_mite":
+    {product_link:"https://www.amazon.in/s?k=miticide+neem+oil+plants",youtube:"https://www.youtube.com/results?search_query=spider+mites+treatment+tomato"},
+  "Tomato___Target_Spot":
+    {product_link:"https://www.amazon.in/s?k=broad+spectrum+fungicide+tomato",youtube:"https://www.youtube.com/results?search_query=target+spot+tomato+treatment"},
+  "Tomato___Tomato_Yellow_Leaf_Curl_Virus":
+    {product_link:"https://www.amazon.in/s?k=imidacloprid+whitefly+control",youtube:"https://www.youtube.com/results?search_query=tomato+yellow+leaf+curl+virus+treatment"},
+  "Tomato___Tomato_mosaic_virus":
+    {product_link:"https://www.amazon.in/s?k=organic+compost+for+plants",youtube:"https://www.youtube.com/results?search_query=tomato+mosaic+virus+control"},
+  "Tomato___Early_blight":
+    {product_link:"https://www.amazon.in/s?k=mancozeb+fungicide",youtube:"https://www.youtube.com/results?search_query=tomato+early+blight+treatment"},
+  "Tomato___Late_blight":
+    {product_link:"https://www.amazon.in/s?k=metalaxyl+fungicide",youtube:"https://www.youtube.com/results?search_query=tomato+late+blight+control"},
+  "Tomato___Bacterial_spot":
+    {product_link:"https://www.amazon.in/s?k=copper+bactericide+plants",youtube:"https://www.youtube.com/results?search_query=tomato+bacterial+spot+treatment"},
+  "Tomato___healthy":
+    {product_link:"https://www.amazon.in/s?k=organic+tomato+fertilizer",youtube:"https://www.youtube.com/results?search_query=tomato+plant+care+tips"},
+  "Tomato__Random":
+    {product_link:"https://www.amazon.in/s?k=tomato+seeds",youtube:"https://www.youtube.com/results?search_query=how+to+grow+tomato+plants"},
+};
+
+function getLinks(disease) {
+  if (solutionsMap[disease]) return solutionsMap[disease];
+  for (const k of Object.keys(solutionsMap)) {
+    const part = k.split('___')[1]?.toLowerCase() || '';
+    if (part && disease.toLowerCase().includes(part)) return solutionsMap[k];
+  }
+  const q = encodeURIComponent(disease.replace(/_/g,' '));
+  return {product_link:`https://www.amazon.in/s?k=${q}+treatment`,youtube:`https://www.youtube.com/results?search_query=${q}+treatment`};
+}
+
+function formatDiseaseName(disease) {
+  // Special handling for Tomato__Random
+  if (disease === "Tomato__Random") {
+    return "🚫 Random Picture";
+  }
+  
+  // For other diseases, format nicely
+  return disease.replace(/Tomato___/g, '').replace(/___/g, ' › ').replace(/_/g, ' ');
+}
+
+/* Chart */
+let chart;
+function initChart() {
+  chart = new Chart(document.getElementById('predictionChart'), {
+    type:'doughnut',
+    data:{
+      labels:['Confidence','Uncertainty'],
+      datasets:[{data:[0,100],backgroundColor:['#5aad44','rgba(255,255,255,0.05)'],borderColor:['#7ec96d','rgba(255,255,255,0.05)'],borderWidth:2,hoverOffset:4}]
+    },
+    options:{responsive:true,cutout:'72%',plugins:{legend:{labels:{color:'#7a9172',font:{family:'DM Sans',size:12}}},tooltip:{callbacks:{label:c=>` ${c.parsed}%`}}}}
+  });
+}
+function updateChart(conf,type) {
+  chart.data.datasets[0].data=[conf,100-conf];
+  
+  if (type === 'healthy') {
+    chart.data.datasets[0].backgroundColor[0]='#5aad44';
+    chart.data.datasets[0].borderColor[0]='#7ec96d';
+  } else if (type === 'unknown') {
+    chart.data.datasets[0].backgroundColor[0]='#d97706';
+    chart.data.datasets[0].borderColor[0]='#e8c96d';
+  } else {
+    chart.data.datasets[0].backgroundColor[0]='#ef4444';
+    chart.data.datasets[0].borderColor[0]='#f87171';
+  }
+  
+  chart.update();
+}
+
+/* Sensor polling */
+let sensorLive={ambient:null,object:null};
+
+async function pollSensor() {
+  try {
+    const res=await fetch('/sensor');
+    const d=await res.json();
+    const dot=document.getElementById('sensorDot');
+    const txt=document.getElementById('sensorStatusText');
+    if (d.object!==null && d.ambient!==null) {
+      sensorLive={ambient:d.ambient,object:d.object};
+      document.getElementById('liveObjTemp').textContent=d.object.toFixed(1);
+      document.getElementById('liveAmbTemp').textContent=d.ambient.toFixed(1);
+      document.getElementById('leafTempCard').textContent=d.object.toFixed(1)+' °C';
+      document.getElementById('ambTempCard').textContent=d.ambient.toFixed(1)+' °C';
+      dot.className='sensor-dot live';
+      txt.textContent='ESP32 Live ✓';
+      document.getElementById('esp32Status').className='dot-green';
+      document.getElementById('esp32Status').textContent='● Online';
+      document.getElementById('mlxStatus').className='dot-green';
+      document.getElementById('mlxStatus').textContent='● Reading';
+      document.getElementById('pollStatus').className='dot-green';
+      document.getElementById('pollStatus').textContent='● Active';
+    } else {
+      dot.className='sensor-dot warn';
+      txt.textContent='Waiting for ESP32…';
+    }
+  } catch(e) {
+    document.getElementById('sensorDot').className='sensor-dot';
+    document.getElementById('sensorStatusText').textContent='Sensor offline';
+  }
+}
+
+/* Image upload */
+async function previewImage(event) {
+  const file=event.target.files[0];
+  if (!file) return;
+  const preview=document.getElementById('preview');
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+  document.getElementById('predictBtn').style.display='block';
+}
+
+async function handleImage() {
+  const fileInput=document.getElementById('imageInput');
+  const file=fileInput.files[0];
+  if (!file) return;
+
+  const btn=document.getElementById('predictBtn');
+  btn.disabled=true;
+  btn.textContent='🔄 Predicting...';
+  
+  const formData=new FormData();
+  formData.append('image',file);
+  let data;
+  try {
+    const res=await fetch('/predict',{method:'POST',body:formData});
+    data=await res.json();
+  } catch(e) {
+    console.error(e);
+    btn.disabled=false;
+    btn.textContent='🔬 Run Prediction';
+    return;
+  }
+
+  const isHealthy=data.disease.toLowerCase().includes('healthy');
+  const isUnknown=data.disease==='Tomato__Random';
+  const links=getLinks(data.disease);
+
+  const displayName = formatDiseaseName(data.disease);
+  document.getElementById('leafStatus').textContent=displayName;
+  document.getElementById('leafStatus').style.fontSize='14px';
+  document.getElementById('confidenceValue').textContent=data.confidence+'%';
+
+  const obj=data.leaf_temp    ??sensorLive.object;
+  const amb=data.ambient_temp ??sensorLive.ambient;
+  if (obj !== null && obj !== "N/A" && !isNaN(obj)) {
+    document.getElementById('leafTempCard').textContent =
+        Number(obj).toFixed(1)+' °C';
+    document.getElementById('scanObjTemp').textContent =
+        Number(obj).toFixed(1);
+  } else {
+    document.getElementById('scanObjTemp').textContent='—';
+  }
+  if (amb !== null && amb !== "N/A" && !isNaN(amb)) {
+    document.getElementById('ambTempCard').textContent =
+        Number(amb).toFixed(1)+' °C';
+    document.getElementById('scanAmbTemp').textContent =
+        Number(amb).toFixed(1);
+  } else {
+    document.getElementById('scanAmbTemp').textContent='—';
+  }
+
+  const box=document.getElementById('resultBox');
+  box.style.display='block';
+  
+  let boxClass='result-box ';
+  if (isUnknown) {
+    boxClass+='unknown';
+  } else if (isHealthy) {
+    boxClass+='healthy';
+  } else {
+    boxClass+='disease';
+  }
+  box.className=boxClass;
+  
+  document.getElementById('diseaseName').textContent=displayName;
+  document.getElementById('confidenceText').textContent=data.confidence+'%';
+  document.getElementById('confidenceFill').style.width=data.confidence+'%';
+  document.getElementById('tempWarning').textContent =
+    data.temp_warning || "Normal";
+
+  document.getElementById('tempStatus').textContent =
+    data.temp_status || "Healthy";
+
+  document.getElementById('riskLevel').textContent =
+    data.risk_level || "LOW";
+
+  document.getElementById('adviceText').textContent =
+    data.advice || '—';
+
+  document.getElementById('fertilizerText').textContent =
+    data.fertilizer || '—';
+
+  document.getElementById('pesticideText').textContent =
+    data.pesticide || '—';
+
+  document.getElementById('organicText').textContent =
+    data.organic || '—';
+  document.getElementById('productLink').href=(data.product_link&&data.product_link!=='#')?data.product_link:links.product_link;
+  document.getElementById('youtubeLink').href=(data.youtube&&data.youtube!=='#')?data.youtube:links.youtube;
+  
+  const chartType = isUnknown ? 'unknown' : (isHealthy ? 'healthy' : 'disease');
+  updateChart(data.confidence, chartType);
+
+  btn.disabled=false;
+  btn.textContent='🔬 Run Prediction';
+}
+
+window.onload=()=>{ initChart(); pollSensor(); setInterval(pollSensor,1000); document.getElementById('predictBtn').addEventListener('click',handleImage); };
+</script>
+</body>
+</html>
